@@ -1,14 +1,20 @@
-// import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 import Header from './Header'
 import Footer from './Footer'
 import './App.css'
 
+type Image = { id: number; title: string; url: string }
+
 function App() {
-  // const [count, setCount] = useState(0)
+  const [image, setImages] = useState<Image[]>([])
 
-  const images = ['A', 'B', 'Test 3']; // Will retrieve from database
-
+  useEffect(() => {
+    fetch('/api/images')
+      .then((res) => res.json())
+      .then(setImages)
+      .catch((err) => console.error('Failed to load images', err))
+  })
 
   return (
     <>
@@ -18,7 +24,7 @@ function App() {
 
       <div className="container">
         <div className="row g-3">
-          {images.map((image, index) => (
+          {image.map((image, index) => (
             <div className="col">
             <div className="card shadow-sm">
               <div className="card-body">
