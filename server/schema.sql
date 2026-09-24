@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS images (
+  id         SERIAL PRIMARY KEY,
+  title      TEXT NOT NULL,
+  s3_key     TEXT NOT NULL UNIQUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);

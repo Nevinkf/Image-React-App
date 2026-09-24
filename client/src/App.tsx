@@ -7,6 +7,9 @@ import './App.css'
 function App() {
   // const [count, setCount] = useState(0)
 
+  const images = ['A', 'B', 'Test 3']; // Will retrieve from database
+
+
   return (
     <>
       <section className = "text-center">
@@ -15,18 +18,16 @@ function App() {
 
       <div className="container">
         <div className="row g-3">
-          <div className="col">fdsf</div>
-          <div className="col">
+          {images.map((image, index) => (
+            <div className="col">
             <div className="card shadow-sm">
               <div className="card-body">
-                <h5 className="card-title">Imaging queue</h5>
+                <div className="card-img-top" key={index}>{image}</div>
                 <p className="card-text text-body-secondary">14 laptops pending.</p>
-                <a href="#" className="btn btn-primary btn-sm">Open</a>
               </div>
             </div>
           </div>
-          <div className="col">fdsf</div>
-          <div className="col">fdsf</div>
+          ))}
         </div>
       </div>
 
