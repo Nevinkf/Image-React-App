@@ -11,10 +11,13 @@ function App() {
 
   useEffect(() => {
     fetch('/api/images')
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) throw new Error('HTTP ${res.status}: ${await res.text()}')
+        return res.json()
+      })
       .then(setImages)
       .catch((err) => console.error('Failed to load images', err))
-  })
+  }, [])
 
   return (
     <>
