@@ -8,6 +8,8 @@ import UploadModal from './UploadModal'
 import { useAuth } from './AuthContext'
 import { api } from './api'
 import './App.css'
+import { useDebounced } from './useDebounced'
+import SearchBar from './SearchBar'
 
 type Image = {
   id: number
@@ -16,6 +18,7 @@ type Image = {
   uploader: string | null
   likeCount: number
   likedByMe: boolean
+  tags: string[]
 }
 
 function App() {
@@ -24,15 +27,36 @@ function App() {
   const [authMode, setAuthMode] = useState<AuthMode | null>(null)
   const [showUpload, setShowUpload] = useState(false)
 
-  const loadImages = useCallback(() => {
-    api<Image[]>('/api/images')
-      .then(setImages)
-      .catch((err) => console.error('Failed to load images', err))
-  }, [])
+  const [search, setSearch] = useState('')
+  const [tag, setTag] = useState<string | null>(null)
+  const debouncedSearch = useDebounced(search.trim(), 300)
 
-  // Reload when the user changes so likedByMe matches whoever is logged in
+  const loadImages = useCallback((signal?: AbortSignal) => {
+    const params = new URLSearchParams()
+    if (debouncedSearch) params.set('q', debouncedSearch)
+    if (tag) params.set('tag', tag)
+    const qs = params.toString()
+    return api<Image[]>(`/api/images${qs ? `?${qs}` : ''}`, { signal })
+      .then(setImages)
+      .catch((err) => {
+        if (err.name !== 'AbortError') console.error('Failed to load images', err)
+      })
+  }, [debouncedSearch, tag])
+
+  // Reload when the user changes so likedByMe matches whoever is logged in.
+  // Abort the previous request so a slow, stale search can't overwrite a newer one.
   useEffect(() => {
-    loadImages()
+    const controller = new AbortController()
+    loadImages(controller.signal)
+    return () => controller.abort()
+  }, [loadImages, user?.id])
+
+  // Reload when the user changes so likedByMe matches whoever is logged in.
+  // Abort the previous request so a slow, stale search can't overwrite a newer one.
+  useEffect(() => {
+    const controller = new AbortController()
+    loadImages(controller.signal)
+    return () => controller.abort()
   }, [loadImages, user?.id])
 
   async function toggleLike(image: Image) {
@@ -62,6 +86,10 @@ function App() {
       <Header onAuth={setAuthMode} onUpload={() => setShowUpload(true)} />
 
       <div className="container">
+        <SearchBar search={search} onSearch={setSearch} tag={tag} onClearTag={() => setTag(null)} />
+        {images.length === 0 && (debouncedSearch || tag) && (
+          <p className="text-body-secondary">No images match your search.</p>
+        )}
         <div className="row g-3">
           {images.map((image) => (
             <div className="col" key={image.id}>
@@ -72,6 +100,20 @@ function App() {
                     <p className="card-text mb-0">{image.title}</p>
                     {image.uploader && (
                       <small className="text-body-secondary">by {image.uploader}</small>
+                    )}
+                    {image.tags.length > 0 && (
+                      <div className="d-flex flex-wrap gap-1 mt-1">
+                        {image.tags.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            className="badge rounded-pill text-bg-light border"
+                            onClick={() => setTag(t)}
+                          >
+                            #{t}
+                          </button>
+                        ))}
+                      </div>
                     )}
                   </div>
                   <Button

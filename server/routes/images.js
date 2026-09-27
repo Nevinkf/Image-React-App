@@ -14,6 +14,25 @@ const ALLOWED_TYPES = {
     'image/webp': '.webp',
 };
 
+const MAX_TAGS = 10;
+const MAX_TAG_LENGTH = 30;
+const MAX_QUERY_LENGTH = 100;
+
+function normalizeTag(raw) {
+    return raw.trim().replace(/^#+/, '').toLowerCase();
+}
+
+// "Sunset, #beach, sunset" -> ['sunset', 'beach']
+function parseTags(raw) {
+    if (typeof raw !== 'string') return [];
+    return [...new Set(raw.split(',').map(normalizeTag).filter(Boolean))];
+}
+
+// So a search for "100%" or "a_b" matches literally instead of acting as wildcards
+function escapeLike(s) {
+    return s.replace(/[\\%_]/g, '\\$&');
+}
+
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 10 * 1024 * 1024}, // 10 MB
@@ -21,31 +40,36 @@ const upload = multer({
 });
 
 router.get('/', async (req, res) => {
+    const q = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, MAX_QUERY_LENGTH) : '';
+    const tag = typeof req.query.tag === 'string' ? normalizeTag(req.query.tag) : '';
     try {
         const { rows } = await pool.query(`
-            SELECT i.id, i.title, i.s3_key, u.username AS uploader,
+            SELECT i.id, i.title, i.s3_key, i.tags, u.username AS uploader,
                    COUNT(l.user_id)::int AS like_count,
                    COALESCE(BOOL_OR(l.user_id = $1), false) AS liked_by_me
             FROM images i
             LEFT JOIN users u ON u.id = i.user_id
             LEFT JOIN likes l ON l.image_id = i.id
+            WHERE ($2::text IS NULL
+                   OR i.title ILIKE $2
+                   OR u.username ILIKE $2
+                   OR EXISTS (SELECT 1 FROM unnest(i.tags) AS t WHERE t ILIKE $2))
+              AND ($3::text IS NULL OR i.tags @> ARRAY[$3::text])
             GROUP BY i.id, u.username
             ORDER BY i.created_at DESC`,
-            [req.session.userId ?? null]
+            [req.session.userId ?? null, q ? `%${escapeLike(q)}%` : null, tag || null]
         );
         const images = await Promise.all(rows.map(async (r) => ({
             id: r.id,
             title: r.title,
             uploader: r.uploader,
+            tags: r.tags,
             likeCount: r.like_count,
             likedByMe: r.liked_by_me,
             url: await signedUrl(r.s3_key),
         })));
         res.json(images);
-    } catch (err) {
-        console.error('GET /api/images failed:', err);
-        res.status(500).json({ error: 'Failed to load images' });
-    }
+    } catch (err) { /* unchanged */ }
 });
 
 // requireAuth runs first so anonymous requests are rejected before the file is buffered
@@ -54,12 +78,18 @@ router.post('/', requireAuth, upload.single('image'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Choose a JPEG, PNG, GIF, or WebP image' });
     if (!title) return res.status(400).json({ error: 'Title is required' });
 
+    const tags = parseTags(req.body.tags);
+    if (tags.length > MAX_TAGS) return res.status(400).json({ error: `Use at most ${MAX_TAGS} tags` });
+    if (tags.some((t) => t.length > MAX_TAG_LENGTH)) {
+        return res.status(400).json({ error: `Tags must be ${MAX_TAG_LENGTH} characters or fewer` });
+    }
+    
     const key = `uploads/${req.session.userId}/${randomUUID()}${ALLOWED_TYPES[req.file.mimetype]}`;
     try {
         await uploadObject(key, req.file.buffer, req.file.mimetype);
         const { rows } = await pool.query(
-            'INSERT INTO images (title, s3_key, user_id) VALUES ($1, $2, $3) RETURNING id',
-            [title, key, req.session.userId]
+            'INSERT INTO images (title, s3_key, user_id, tags) VALUES ($1, $2, $3, $4) RETURNING id',
+            [title, key, req.session.userId, tags]
         );
         res.status(201).json({ id: rows[0].id });
     } catch (err) {

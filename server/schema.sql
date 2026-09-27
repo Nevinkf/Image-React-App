@@ -24,3 +24,7 @@ CREATE TABLE IF NOT EXISTS likes (
   PRIMARY KEY (user_id, image_id)
 );
 CREATE INDEX IF NOT EXISTS likes_image_id_idx ON likes (image_id);
+
+-- Free-form user tags, stored normalized (lowercase, no leading '#')
+ALTER TABLE images ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
+CREATE INDEX IF NOT EXISTS images_tags_idx ON images USING GIN (tags);

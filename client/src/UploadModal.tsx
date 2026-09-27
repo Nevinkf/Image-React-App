@@ -9,6 +9,7 @@ function UploadModal({ show, onClose, onUploaded }: Props) {
   const [file, setFile] = useState<File | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [tags, setTags] = useState('')
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -16,7 +17,9 @@ function UploadModal({ show, onClose, onUploaded }: Props) {
     const form = new FormData()
     form.append('title', title)
     form.append('image', file)
+    form.append('tags', tags)
 
+  
     setSubmitting(true)
     setError(null)
     try {
@@ -24,6 +27,7 @@ function UploadModal({ show, onClose, onUploaded }: Props) {
       await api('/api/images', { method: 'POST', body: form })
       setTitle('')
       setFile(null)
+      setTags('')
       onUploaded()
       onClose()
     } catch (err) {
@@ -44,6 +48,15 @@ function UploadModal({ show, onClose, onUploaded }: Props) {
           <Form.Group className="mb-3" controlId="uploadTitle">
             <Form.Label>Title</Form.Label>
             <Form.Control value={title} onChange={(e) => setTitle(e.target.value)} required />
+          </Form.Group>
+           <Form.Group className="mb-3" controlId="uploadTags">
+            <Form.Label>Tags</Form.Label>
+            <Form.Control
+              value={tags}
+              onChange={(e) => setTags(e.target.value)}
+              placeholder="sunset, beach, travel"
+            />
+            <Form.Text>Optional, comma-separated. Up to 10.</Form.Text>
           </Form.Group>
           <Form.Group controlId="uploadFile">
             <Form.Label>Image (max 10 MB)</Form.Label>
