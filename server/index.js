@@ -1,37 +1,28 @@
 import 'dotenv/config';
 import express from 'express';
+import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pool } from './db.js';
-import { signedUrl } from './s3.js';
-import e from 'express';
-import { error } from 'node:console';
+import { sessionMiddleware } from './auth.js';
+import authRoutes from './routes/auth.js';
+import imageRoutes from './routes/images.js';
 
 const app = express();
+
+// Behind a load balancer or nginx in prod: needed so `secure` cookies are set over the proxied HTTPS
+if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
 app.use(express.json());
+app.use(sessionMiddleware);
 
-app.get('/api/hello', (req, res) => {
-    res.json({message: "Hello from Express"});
+app.use('/api/auth', authRoutes);
+app.use('/api/images', imageRoutes);
+
+// Turn multer errors (e.g. file too large) into JSON 400s instead of HTML 500s
+app.use('/api', (err, req, res, next) => {
+    if (err instanceof multer.MulterError) return res.status(400).json({ error: err.message });
+    console.error(err);
+    res.status(500).json({ error: 'Something went wrong' });
 });
-
-
-app.get('/api/images', async (req, res) => {
-    try {
-         const { rows } = await pool.query(
-        'SELECT id, title, s3_key FROM images ORDER BY created_at DESC'
-        );
-        const images = await Promise.all(rows.map(async (r) => ({
-            id: r.id,
-            title: r.title,
-            url: await signedUrl(r.s3_key),
-        })))
-        res.json(images);
-    } catch (err) {
-        console.error('GET /api/images failed:', err)
-        res.status(500).json({error: 'Failed to load images'})
-    }
-})
-
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const dist = path.join(__dirname, '../client/dist');
