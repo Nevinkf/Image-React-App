@@ -15,7 +15,7 @@ export const sessionMiddleware = session({
         httpOnly: true, // JS can't read it, so XSS can't steal the session
         sameSite: 'lax', // blocks cross-site POST/DELETE (CSRF)
         secure: process.env.NODE_ENV === 'production', // HTTPS-only in prod
-        maxAge: 30 * 24 * 60 * 60 * 60 * 1000, // 30 days
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
     },
 })
 

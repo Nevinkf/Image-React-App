@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import argon2 from 'argon2';
-import { pool } from '..db.js'
+import { pool } from '../db.js';
 
 const router = Router();
 
@@ -31,10 +31,10 @@ router.post('/register', async (req, res) => {
             [username, hash]
         );
         await startSession(req, rows[0]);
-        res.status(201).json(row[0]);
+        res.status(201).json(rows[0]);
     } catch (err) {
         if (err.code === '23505') return res.status(409).json({ error: 'That username is taken'});
-        console.error('POST /api/auth/register failed:'. err);
+        console.error('POST /api/auth/register failed:', err);
         res.status(500).json({ error: 'Failed to register' });
     }
 });
@@ -55,14 +55,14 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid username or password' });
         }
         await startSession(req, user);
-        res.join({ id: user.id, username: user.username });
+        res.json({ id: user.id, username: user.username });
     } catch (err) {
         console.error('POST /api/auth/login failed:', err);
         res.status(500).json({ error: 'Failed to log in' });
     }
 });
 
-rotuer.post('/logout', (req, res) => {
+router.post('/logout', (req, res) => {
     req.session.destroy((err => {
         if (err) {
             console.error('POST /api/auth/logout failed:', err);

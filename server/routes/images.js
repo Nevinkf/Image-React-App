@@ -9,14 +9,14 @@ const router = Router();
 
 const ALLOWED_TYPES = {
     'image/jpeg': '.jpg',
-    'images/png': '.png',
-    'images/gif': '.gif',
-    'images/webp': '.webp',
+    'image/png': '.png',
+    'image/gif': '.gif',
+    'image/webp': '.webp',
 };
 
 const upload = multer({
-    storage: multer.memoeryStorage(),
-    limits: { filesSize: 10 * 1024 * 1024}, // 10 MB
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024}, // 10 MB
     fileFilter: (req, file, cb) => cb(null, file.mimetype in ALLOWED_TYPES),
 });
 
@@ -30,8 +30,18 @@ router.get('/', async (req, res) => {
             LEFT JOIN users u ON u.id = i.user_id
             LEFT JOIN likes l ON l.image_id = i.id
             GROUP BY i.id, u.username
-            ORDER BY i.created_at DESC
-            `,);
+            ORDER BY i.created_at DESC`,
+            [req.session.userId ?? null]
+        );
+        const images = await Promise.all(rows.map(async (r) => ({
+            id: r.id,
+            title: r.title,
+            uploader: r.uploader,
+            likeCount: r.like_count,
+            likedByMe: r.liked_by_me,
+            url: await signedUrl(r.s3_key),
+        })));
+        res.json(images);
     } catch (err) {
         console.error('GET /api/images failed:', err);
         res.status(500).json({ error: 'Failed to load images' });
