@@ -9,8 +9,8 @@ import imageRoutes from './routes/images.js';
 
 const app = express();
 
-// Behind a load balancer or nginx in prod: needed so `secure` cookies are set over the proxied HTTPS
-if (process.env.NODE_ENV === 'production') app.set('trust proxy', 1);
+// Behind nginx (or the Vite dev proxy): trust X-Forwarded-Proto so `secure: 'auto'` can tell HTTP from HTTPS
+app.set('trust proxy', 1);
 app.use(express.json());
 app.use(sessionMiddleware);
 
