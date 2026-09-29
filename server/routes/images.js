@@ -69,7 +69,10 @@ router.get('/', async (req, res) => {
             url: await signedUrl(r.s3_key),
         })));
         res.json(images);
-    } catch (err) { /* unchanged */ }
+    } catch (err) {
+    console.error('GET /api/images failed:', err);
+    res.status(500).json({ error: 'Failed to load images' });
+}
 });
 
 // requireAuth runs first so anonymous requests are rejected before the file is buffered
